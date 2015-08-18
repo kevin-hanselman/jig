@@ -1,0 +1,109 @@
+#!/bin/bash
+
+set -euo pipefail
+
+prog="$(basename "$0")"
+
+usage () {
+    echo -e "usage: $prog [options] command [name]"
+    echo
+    echo -e "Stash Mercurial working directory changes."
+    echo -e "Simple, safe, and branch-friendly."
+    echo
+    echo -e "Commands:"
+    echo -e "  stash             export changes to a patch file"
+    echo -e "  unstash           import changes from a patch file"
+    echo -e "  list              list patch files"
+    echo -e "  show              show the contents of a patch file"
+    echo
+    echo -e "Arguments:"
+    echo -e "  name              name of the patch file to use"
+    echo -e "                    (excluding file extension)"
+    echo -e "                    (defaults to the current branch name)"
+    echo
+    echo -e "Options:"
+    echo -e "  -h, --help        print this text and exit"
+    echo -e "  -f, --force       overwrite an existing patch file"
+}
+
+error() {
+    echo -e "$prog: $1" >&2
+    exit 1
+}
+
+jig_export() {
+    [ -n "$(hg status)" ] || error 'No changes to stash'
+    hg diff --git > "$1"
+    chmod -w "$1"
+    hg revert --all --no-backup
+}
+
+jig_import() {
+    hg import --no-commit "$1"
+}
+
+force=
+args=$(getopt -o h,f -l help,force -n "$prog" -- "$@")
+eval set -- "$args"
+while true; do
+    case "$1" in
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        -f|--force)
+            force='true'
+            shift
+            ;;
+        --)
+            shift
+            break
+            ;;
+        *)
+            exit 1
+            ;;
+    esac
+done
+
+hg root >/dev/null 2>&1 || error 'Not in a Mercurial repository'
+
+jigdir="$(hg root)/.hg/jig"
+mkdir -p "$jigdir"
+
+set +u
+if [ -n "$2" ]; then
+    name="$2"
+else
+    name="$(hg branch)"
+fi
+action="$1"
+set -u
+
+# basename protects against branches with forward slashes
+patchfile="$jigdir/$(basename $name).patch"
+
+case "$action" in
+    unstash)
+        jig_import "$patchfile"
+        ;;
+    stash)
+        [ -s "$patchfile" ] && [ -z "$force" ] && error "Patch file '$patchfile' not empty. Use `-f` to force."
+        jig_export "$patchfile"
+        ;;
+    list)
+        ls "$jigdir" | sed -e 's/\.patch//'
+        ;;
+    show)
+        [ -s "$patchfile" ] || error "Patch file '$patchfile' not found or empty"
+        if [ -n "$EDITOR" ]; then
+            $EDITOR "$patchfile"
+        else
+            less "$patchfile"
+        fi
+        ;;
+    *)
+        usage
+        error 'Command not found'
+        ;;
+esac
+
