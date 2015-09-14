@@ -33,6 +33,7 @@ error() {
 
 jig_export() {
     [ -n "$(hg status)" ] || error 'No changes to stash'
+    [ -f "$1" ] && chmod +w "$1"
     hg diff --git > "$1"
     chmod -w "$1"
     hg revert --all --no-backup
