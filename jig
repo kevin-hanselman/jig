@@ -88,7 +88,7 @@ case "$action" in
         jig_import "$patchfile"
         ;;
     stash)
-        [ -s "$patchfile" ] && [ -z "$force" ] && error "Patch file '$patchfile' not empty. Use `-f` to force."
+        [ -s "$patchfile" ] && [ -z "$force" ] && error "Patch file '$patchfile' not empty. Use '-f' to force."
         jig_export "$patchfile"
         ;;
     list)
