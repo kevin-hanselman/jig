@@ -2,28 +2,29 @@
 
 set -euo pipefail
 
-prog="$(basename "$0")"
+prog=$(basename "$0")
 
 usage () {
-    echo -e "usage: $prog [options] command [name]"
+    echo "usage: $prog [options] command [name]"
     echo
-    echo -e "Stash Mercurial working directory changes."
-    echo -e "Simple, safe, and branch-friendly."
+    echo "Stash Mercurial working directory changes."
+    echo "Simple, safe, and branch-friendly."
     echo
-    echo -e "Commands:"
-    echo -e "  stash             export changes to a patch file"
-    echo -e "  unstash           import changes from a patch file"
-    echo -e "  list              list patch files"
-    echo -e "  show              show the contents of a patch file"
+    echo "Commands:"
+    echo "  stash             export changes to a patch file"
+    echo "  unstash           import changes from a patch file"
+    echo "  list              list patch files"
+    echo "  show              show the contents of a patch file"
     echo
-    echo -e "Arguments:"
-    echo -e "  name              name of the patch file to use"
-    echo -e "                    (excluding file extension)"
-    echo -e "                    (defaults to the current branch name)"
+    echo "Arguments:"
+    echo "  name              name of the patch file to use"
+    echo "                    (excluding file extension)"
+    echo "                    (defaults to the current branch name)"
     echo
-    echo -e "Options:"
-    echo -e "  -h, --help        print this text and exit"
-    echo -e "  -f, --force       overwrite an existing patch file"
+    echo "Options:"
+    echo "  -h, --help        print this text and exit"
+    echo "  -f, --force       overwrite an existing patch file"
+    echo "  -b, --backup      backup your changes when calling 'hg revert'"
 }
 
 error() {
@@ -36,7 +37,7 @@ jig_export() {
     [ -f "$1" ] && chmod +w "$1"
     hg diff --git > "$1"
     chmod -w "$1"
-    hg revert --all --no-backup
+    hg revert --all "$backup"
 }
 
 jig_import() {
@@ -44,7 +45,8 @@ jig_import() {
 }
 
 force=
-args=$(getopt -o h,f -l help,force -n "$prog" -- "$@")
+backup='--no-backup'
+args=$(getopt -o h,f,b -l help,force,backup -n "$prog" -- "$@")
 eval set -- "$args"
 while true; do
     case "$1" in
@@ -54,6 +56,10 @@ while true; do
             ;;
         -f|--force)
             force='true'
+            shift
+            ;;
+        -b|--backup)
+            backup=
             shift
             ;;
         --)
@@ -81,7 +87,7 @@ action="$1"
 set -u
 
 # basename protects against branches with forward slashes
-patchfile="$jigdir/$(basename $name).patch"
+patchfile="$jigdir/$(basename "$name").patch"
 
 case "$action" in
     unstash)
@@ -92,7 +98,8 @@ case "$action" in
         jig_export "$patchfile"
         ;;
     list)
-        ls "$jigdir" | sed -e 's/\.patch//'
+        echo "Patch names from files in '$jigdir/':"
+        find "$jigdir" -type f -iname '*.patch' -exec basename {} \; | sed -e 's/.patch$//'
         ;;
     show)
         [ -s "$patchfile" ] || error "Patch file '$patchfile' not found or empty"
